@@ -1,0 +1,8 @@
+{
+  "name": "FoodRescueNet",
+  "description": "A surplus food rescue network connecting donors with NGOs and charities across Tamil Nadu, featuring AI freshness detection and waste analytics.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
