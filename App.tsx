@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, FoodItem, FoodRequest, DeliveryRecord } from './types';
+import { db } from './services/db';
 import Login from './components/Login';
 import BrowseFood from './components/BrowseFood';
 import DonateFood from './components/DonateFood';
@@ -16,84 +17,71 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('browse');
   
-  const [registeredUsers, setRegisteredUsers] = useState<User[]>(() => {
-    try {
-      const saved = localStorage.getItem('foodrescue_users');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [requests, setRequests] = useState<FoodRequest[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
 
-  const [foodItems, setFoodItems] = useState<FoodItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('foodrescue_items');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  const [requests, setRequests] = useState<FoodRequest[]>(() => {
-    try {
-      const saved = localStorage.getItem('foodrescue_requests');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  const [deliveries, setDeliveries] = useState<DeliveryRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('foodrescue_deliveries');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // Initialize data from DB
+  const loadData = async () => {
+    const items = await db.getFoodItems();
+    const reqs = await db.getRequests();
+    const dels = await db.getDeliveries();
+    setFoodItems(items);
+    setRequests(reqs);
+    setDeliveries(dels);
+  };
 
   useEffect(() => {
-    localStorage.setItem('foodrescue_users', JSON.stringify(registeredUsers));
-  }, [registeredUsers]);
+    loadData();
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('foodrescue_items', JSON.stringify(foodItems));
-  }, [foodItems]);
-
-  useEffect(() => {
-    localStorage.setItem('foodrescue_requests', JSON.stringify(requests));
-  }, [requests]);
-
-  useEffect(() => {
-    localStorage.setItem('foodrescue_deliveries', JSON.stringify(deliveries));
-  }, [deliveries]);
-
-  const handleLogin = (role: UserRole, name: string, email: string) => {
-    const user = registeredUsers.find(u => u.email === email);
-    if (user) {
-      setCurrentUser(user);
-      if (user.role === UserRole.DELIVERY) setActiveTab('delivery');
-    } else {
-      const mockUser: User = { 
-        id: Math.random().toString(36).substr(2, 9), 
-        name: name || 'User', 
-        role: role, 
-        email
-      };
-      setRegisteredUsers(prev => [...prev, mockUser]);
-      setCurrentUser(mockUser);
-      if (role === UserRole.DELIVERY) setActiveTab('delivery');
+  const setInitialTabForRole = (role: UserRole) => {
+    switch (role) {
+      case UserRole.DONOR:
+        setActiveTab('donate');
+        break;
+      case UserRole.DELIVERY:
+        setActiveTab('delivery');
+        break;
+      case UserRole.NGO:
+      case UserRole.RECIPIENT:
+        setActiveTab('browse');
+        break;
+      default:
+        setActiveTab('browse');
     }
   };
 
-  const handleSignup = (name: string, email: string, password: string, role: UserRole) => {
+  const handleLogin = async (role: UserRole, name: string, email: string) => {
+    let user = await db.getUserByEmail(email);
+    
+    if (!user) {
+      // Auto-register with the selected role for new email
+      user = { 
+        id: Math.random().toString(36).substr(2, 9), 
+        name: name || email.split('@')[0], 
+        role: role, 
+        email: email.toLowerCase()
+      };
+      await db.saveUser(user);
+    }
+    
+    setCurrentUser(user);
+    setInitialTabForRole(user.role);
+    await loadData(); // Ensure UI is fresh for the new user
+  };
+
+  const handleSignup = async (name: string, email: string, password: string, role: UserRole) => {
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
-      name, role, email
+      name, 
+      role, 
+      email: email.toLowerCase()
     };
-    setRegisteredUsers([...registeredUsers, newUser]);
+    await db.saveUser(newUser);
     setCurrentUser(newUser);
-    if (role === UserRole.DELIVERY) setActiveTab('delivery');
+    setInitialTabForRole(role);
+    await loadData();
   };
 
   const handleLogout = () => {
@@ -101,10 +89,10 @@ const App: React.FC = () => {
     setActiveTab('browse');
   };
 
-  const handleAddDonation = (item: FoodItem) => {
-    setFoodItems([item, ...foodItems]);
+  const handleAddDonation = async (item: FoodItem) => {
+    await db.saveFoodItem(item);
+    setFoodItems(prev => [item, ...prev]);
     
-    // Auto-create a pending delivery for testing
     const newDelivery: DeliveryRecord = {
       id: Math.random().toString(36).substr(2, 9),
       foodId: item.id,
@@ -117,11 +105,13 @@ const App: React.FC = () => {
       status: 'Pending',
       distance: (Math.random() * 15 + 1).toFixed(1) + ' km'
     };
-    setDeliveries([newDelivery, ...deliveries]);
+    await db.saveDelivery(newDelivery);
+    setDeliveries(prev => [newDelivery, ...prev]);
+    // Stay on donate or go to browse? User requested it disappear, so browse is fine to see it gone.
     setActiveTab('browse');
   };
 
-  const handleRequestFood = (foodId: string) => {
+  const handleRequestFood = async (foodId: string) => {
     if (!currentUser) return;
     const food = foodItems.find(f => f.id === foodId);
     if (!food) return;
@@ -135,31 +125,69 @@ const App: React.FC = () => {
         status: 'Pending',
         timestamp: new Date().toISOString()
     };
-    setRequests([newRequest, ...requests]);
-    setFoodItems(prev => prev.map(f => f.id === foodId ? { ...f, status: 'Requested' } : f));
+    await db.saveRequest(newRequest);
+    setRequests(prev => [newRequest, ...prev]);
+    
+    const updatedFood = { ...food, status: 'Requested' as const };
+    await db.updateFoodItem(updatedFood);
+    setFoodItems(prev => prev.map(f => f.id === foodId ? updatedFood : f));
     setActiveTab('requests');
   };
 
-  const handleUpdateDeliveryStatus = (deliveryId: string, newStatus: 'In Transit' | 'Completed') => {
-    setDeliveries(prev => prev.map(d => d.id === deliveryId ? { ...d, status: newStatus } : d));
-    
+  const handleUpdateDeliveryStatus = async (deliveryId: string, newStatus: 'In Transit' | 'Completed') => {
     const delivery = deliveries.find(d => d.id === deliveryId);
-    if (delivery && newStatus === 'Completed') {
-       setFoodItems(prev => prev.map(f => f.id === delivery.foodId ? { ...f, status: 'Delivered' } : f));
-       setRequests(prev => prev.map(r => r.foodId === delivery.foodId ? { ...r, status: 'Delivered' } : r));
-    } else if (delivery && newStatus === 'In Transit') {
-       setFoodItems(prev => prev.map(f => f.id === delivery.foodId ? { ...f, status: 'In Transit' } : f));
-       setRequests(prev => prev.map(r => r.foodId === delivery.foodId ? { ...r, status: 'In Transit' } : r));
+    if (!delivery) return;
+
+    const updatedDelivery = { ...delivery, status: newStatus };
+    await db.updateDelivery(updatedDelivery);
+    setDeliveries(prev => prev.map(d => d.id === deliveryId ? updatedDelivery : d));
+    
+    if (newStatus === 'Completed') {
+       const food = foodItems.find(f => f.id === delivery.foodId);
+       if (food) {
+         const updatedFood = { ...food, status: 'Delivered' as const };
+         await db.updateFoodItem(updatedFood);
+         setFoodItems(prev => prev.map(f => f.id === food.id ? updatedFood : f));
+       }
+       const req = requests.find(r => r.foodId === delivery.foodId);
+       if (req) {
+         const updatedReq = { ...req, status: 'Delivered' as const };
+         await db.updateRequest(updatedReq);
+         setRequests(prev => prev.map(r => r.foodId === delivery.foodId ? updatedReq : r));
+       }
+    } else if (newStatus === 'In Transit') {
+       const food = foodItems.find(f => f.id === delivery.foodId);
+       if (food) {
+         const updatedFood = { ...food, status: 'In Transit' as const };
+         await db.updateFoodItem(updatedFood);
+         setFoodItems(prev => prev.map(f => f.id === food.id ? updatedFood : f));
+       }
+       const req = requests.find(r => r.foodId === delivery.foodId);
+       if (req) {
+         const updatedReq = { ...req, status: 'In Transit' as const };
+         await db.updateRequest(updatedReq);
+         setRequests(prev => prev.map(r => r.foodId === delivery.foodId ? updatedReq : r));
+       }
     }
   };
 
-  const handleUpdateLiveLocation = (deliveryId: string, lat: number, lng: number) => {
-    setDeliveries(prev => prev.map(d => d.id === deliveryId ? { ...d, currentLocation: { lat, lng } } : d));
+  const handleUpdateLiveLocation = async (deliveryId: string, lat: number, lng: number) => {
+    const delivery = deliveries.find(d => d.id === deliveryId);
+    if (delivery) {
+      const updated = { ...delivery, currentLocation: { lat, lng } };
+      await db.updateDelivery(updated);
+      setDeliveries(prev => prev.map(d => d.id === deliveryId ? updated : d));
+    }
   };
 
-  const handleAcceptDelivery = (deliveryId: string) => {
+  const handleAcceptDelivery = async (deliveryId: string) => {
     if (!currentUser) return;
-    setDeliveries(prev => prev.map(d => d.id === deliveryId ? { ...d, driverId: currentUser.id } : d));
+    const delivery = deliveries.find(d => d.id === deliveryId);
+    if (delivery) {
+      const updated = { ...delivery, driverId: currentUser.id };
+      await db.updateDelivery(updated);
+      setDeliveries(prev => prev.map(d => d.id === deliveryId ? updated : d));
+    }
   };
 
   if (!currentUser) {
@@ -217,14 +245,30 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Navigation Bar */}
+        {/* Navigation Bar - Strictly Role-Based */}
         <div className="max-w-7xl mx-auto px-6 flex items-center overflow-x-auto custom-scrollbar">
-          <NavTab icon="fa-list-ul" label="Browse Food" active={activeTab === 'browse'} onClick={() => setActiveTab('browse')} />
-          <NavTab icon="fa-plus" label="Donate Food" active={activeTab === 'donate'} onClick={() => setActiveTab('donate')} />
-          <NavTab icon="fa-file-lines" label="My Requests" active={activeTab === 'requests'} onClick={() => setActiveTab('requests')} />
+          {/* Consumer View */}
+          {(currentUser.role === UserRole.NGO || currentUser.role === UserRole.RECIPIENT) && (
+            <NavTab icon="fa-list-ul" label="Rescue Feed" active={activeTab === 'browse'} onClick={() => setActiveTab('browse')} />
+          )}
+
+          {/* Donor View */}
+          {currentUser.role === UserRole.DONOR && (
+            <NavTab icon="fa-plus" label="Donation Studio" active={activeTab === 'donate'} onClick={() => setActiveTab('donate')} />
+          )}
+
+          {/* Logistics View */}
           {currentUser.role === UserRole.DELIVERY && (
             <NavTab icon="fa-truck-fast" label="Logistics Hub" active={activeTab === 'delivery'} onClick={() => setActiveTab('delivery')} />
           )}
+
+          {/* Shared Common Tabs */}
+          <NavTab 
+            icon="fa-file-lines" 
+            label={currentUser.role === UserRole.DONOR ? "My Listings" : currentUser.role === UserRole.DELIVERY ? "My Trips" : "My Claims"} 
+            active={activeTab === 'requests'} 
+            onClick={() => setActiveTab('requests')} 
+          />
           <NavTab icon="fa-building-ngo" label="NGOs & Charities" active={activeTab === 'ngos'} onClick={() => setActiveTab('ngos')} />
           <NavTab icon="fa-chart-simple" label="Intelligence Hub" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} />
           <NavTab icon="fa-user-gear" label="Profile" active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
