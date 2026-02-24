@@ -42,6 +42,7 @@ export interface FoodRequest {
   requesterName: string;
   status: 'Pending' | 'Approved' | 'In Transit' | 'Delivered';
   timestamp: string;
+  deliveryAddress?: string;
 }
 
 export interface DeliveryRecord {
@@ -56,6 +57,8 @@ export interface DeliveryRecord {
   status: 'Pending' | 'In Transit' | 'Completed';
   distance: string;
   driverId?: string;
+  donorPhone?: string;
+  recipientPhone?: string;
   currentLocation?: {
     lat: number;
     lng: number;

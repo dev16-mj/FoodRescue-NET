@@ -1,14 +1,32 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { FoodItem, User, UserRole } from '../types';
 
 interface BrowseFoodProps {
   items: FoodItem[];
   currentUser: User;
-  onRequest: (foodId: string) => void;
+  onRequest: (foodId: string, deliveryAddress: string) => void;
 }
 
 const BrowseFood: React.FC<BrowseFoodProps> = ({ items, currentUser, onRequest }) => {
+  const [requestingId, setRequestingId] = useState<string | null>(null);
+  const [address, setAddress] = useState(currentUser.address || '');
+
+  const handleRequest = (foodId: string) => {
+    if (!address) {
+      setRequestingId(foodId);
+    } else {
+      onRequest(foodId, address);
+    }
+  };
+
+  const confirmRequest = () => {
+    if (requestingId && address) {
+      onRequest(requestingId, address);
+      setRequestingId(null);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
@@ -88,12 +106,42 @@ const BrowseFood: React.FC<BrowseFoodProps> = ({ items, currentUser, onRequest }
 
                 <div className="pt-4 border-t border-gray-50">
                   {(currentUser.role === UserRole.NGO || currentUser.role === UserRole.RECIPIENT) && (
-                    <button 
-                      onClick={() => onRequest(item.id)}
-                      className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-600 transition-all shadow-lg shadow-gray-100 group-hover:shadow-emerald-100"
-                    >
-                      Rescure This Item
-                    </button>
+                    <div className="space-y-3">
+                      {requestingId === item.id ? (
+                        <div className="animate-in slide-in-from-top-2 duration-300">
+                          <input 
+                            type="text"
+                            placeholder="Enter Delivery Address..."
+                            className="w-full px-4 py-2 text-xs border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none mb-2"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={confirmRequest}
+                              disabled={!address}
+                              className="flex-1 py-2 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50"
+                            >
+                              Confirm Rescue
+                            </button>
+                            <button 
+                              onClick={() => setRequestingId(null)}
+                              className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-gray-200 transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => handleRequest(item.id)}
+                          className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-600 transition-all shadow-lg shadow-gray-100 group-hover:shadow-emerald-100"
+                        >
+                          Rescue This Item
+                        </button>
+                      )}
+                    </div>
                   )}
                   {currentUser.role === UserRole.DONOR && (
                     <div className="w-full py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">

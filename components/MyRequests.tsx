@@ -38,6 +38,7 @@ const MyRequests: React.FC<MyRequestsProps> = ({ requests, role, deliveries }) =
                   <th className="py-4 px-6">Food Item</th>
                   <th className="py-4 px-6">{role === UserRole.DONOR ? 'Requester' : 'Donor'}</th>
                   <th className="py-4 px-6">Date</th>
+                  <th className="py-4 px-6">Delivery Address</th>
                   <th className="py-4 px-6">Status</th>
                   <th className="py-4 px-6 text-right">Action</th>
                 </tr>
@@ -52,6 +53,7 @@ const MyRequests: React.FC<MyRequestsProps> = ({ requests, role, deliveries }) =
                       <td className="py-4 px-6 font-bold text-gray-700">{req.foodTitle}</td>
                       <td className="py-4 px-6 text-gray-600">{req.requesterName}</td>
                       <td className="py-4 px-6 text-gray-400">{new Date(req.timestamp).toLocaleDateString()}</td>
+                      <td className="py-4 px-6 text-gray-500 text-xs italic">{req.deliveryAddress || 'N/A'}</td>
                       <td className="py-4 px-6">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                           req.status === 'In Transit' ? 'bg-emerald-50 text-emerald-600 animate-pulse' : 'bg-blue-50 text-blue-600'
@@ -105,8 +107,8 @@ const TrackingModal: React.FC<{ delivery: DeliveryRecord, onClose: () => void }>
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance.current);
       
       const customIcon = L.divIcon({
-        html: `<div class="bg-emerald-600 w-8 h-8 rounded-full border-4 border-white flex items-center justify-center shadow-xl text-white">
-                 <i class="fa-solid fa-truck-fast text-[10px]"></i>
+        html: `<div class="truck-pulse bg-emerald-600 w-8 h-8 rounded-full border-4 border-white flex items-center justify-center shadow-xl text-white">
+                 <i class="fa-solid fa-truck text-[12px]"></i>
                </div>`,
         className: '',
         iconSize: [32, 32],
@@ -123,13 +125,16 @@ const TrackingModal: React.FC<{ delivery: DeliveryRecord, onClose: () => void }>
     }
 
     return () => {
-      // Clean up on unmount is handled if modal re-opens
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
     };
   }, [delivery.currentLocation]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-2xl h-[70vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden relative">
+      <div className="bg-white w-full max-w-4xl h-[85vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden relative">
         <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-white z-10">
           <div className="flex items-center gap-4">
              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">

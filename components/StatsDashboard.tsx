@@ -235,6 +235,41 @@ const StatsDashboard: React.FC<StatsDashboardProps> = ({ foodItems = [] }) => {
           </div>
         </div>
       </div>
+
+      {/* Available Food Inventory Section */}
+      <section className="space-y-8">
+        <div className="flex items-center gap-4">
+           <div className="h-0.5 flex-1 bg-gray-100"></div>
+           <div className="flex items-center gap-2">
+              <i className="fa-solid fa-box-open text-emerald-500"></i>
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.3em]">Live Inventory Snapshot</h3>
+           </div>
+           <div className="h-0.5 flex-1 bg-gray-100"></div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {foodItems.filter(i => i.status === 'Available').length === 0 ? (
+            <div className="col-span-full bg-white border border-dashed border-gray-200 rounded-[32px] p-12 text-center">
+              <p className="text-gray-400 font-bold text-sm">No available items in the network currently.</p>
+            </div>
+          ) : (
+            foodItems.filter(i => i.status === 'Available').map(item => (
+              <div key={item.id} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-all">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50 flex-shrink-0">
+                  <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-black text-gray-900 truncate text-sm">{item.title}</h4>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.quantity} • {item.location}</p>
+                </div>
+                <div className="bg-emerald-50 text-emerald-600 text-[10px] font-black px-3 py-1 rounded-full">
+                  LIVE
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 };

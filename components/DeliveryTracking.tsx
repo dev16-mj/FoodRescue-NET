@@ -18,6 +18,7 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({
   onUpdateLocation
 }) => {
   const [trackingId, setTrackingId] = useState<number | null>(null);
+  const [selectedDelivery, setSelectedDelivery] = useState<DeliveryRecord | null>(null);
   const myDeliveries = deliveries.filter(d => d.driverId === currentUser.id);
   const availableDeliveries = deliveries.filter(d => d.status === 'Pending' && !d.driverId);
   const activeDelivery = myDeliveries.find(d => d.status === 'In Transit');
@@ -144,9 +145,13 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({
           ) : (
             <div className="space-y-4">
               {myDeliveries.filter(d => d.status !== 'Completed').map(delivery => (
-                <div key={delivery.id} className="bg-white border-2 border-emerald-50 p-6 rounded-[24px] shadow-sm">
+                <div 
+                  key={delivery.id} 
+                  onClick={() => setSelectedDelivery(delivery)}
+                  className="bg-white border-2 border-emerald-50 p-6 rounded-[24px] shadow-sm cursor-pointer hover:border-emerald-200 transition-all group"
+                >
                   <div className="flex justify-between items-start mb-4">
-                    <h4 className="font-bold text-gray-900">{delivery.foodTitle}</h4>
+                    <h4 className="font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">{delivery.foodTitle}</h4>
                     <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-widest animate-pulse">
                       {delivery.status}
                     </span>
@@ -162,23 +167,23 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    {delivery.status === 'Pending' ? (
-                      <button 
-                        onClick={() => onUpdateStatus(delivery.id, 'In Transit')}
-                        className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all"
-                      >
-                        Start Delivery
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => onUpdateStatus(delivery.id, 'Completed')}
-                        className="flex-1 py-3 bg-emerald-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-950 transition-all"
-                      >
-                        Confirm Drop-off
-                      </button>
-                    )}
-                    <button className="px-4 py-3 bg-gray-50 text-gray-400 rounded-xl hover:text-emerald-600 transition-colors">
-                      <i className="fa-solid fa-phone"></i>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUpdateStatus(delivery.id, delivery.status === 'Pending' ? 'In Transit' : 'Completed');
+                      }}
+                      className={`flex-1 py-3 ${delivery.status === 'Pending' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-emerald-900 hover:bg-emerald-950'} text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all`}
+                    >
+                      {delivery.status === 'Pending' ? 'Start Delivery' : 'Confirm Drop-off'}
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDelivery(delivery);
+                      }}
+                      className="px-4 py-3 bg-gray-50 text-gray-400 rounded-xl hover:text-emerald-600 transition-colors"
+                    >
+                      <i className="fa-solid fa-circle-info"></i>
                     </button>
                   </div>
                 </div>
@@ -187,6 +192,84 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({
           )}
         </section>
       </div>
+
+      {/* Delivery Details Modal */}
+      {selectedDelivery && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                  <i className="fa-solid fa-truck-ramp-box"></i>
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900">Delivery Details</h3>
+                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Order ID: {selectedDelivery.id.toUpperCase()}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedDelivery(null)}
+                className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-all"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8">
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Food Item</h4>
+                <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                  <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-emerald-500 shadow-sm">
+                    <i className="fa-solid fa-utensils"></i>
+                  </div>
+                  <span className="font-black text-gray-800">{selectedDelivery.foodTitle}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Donor (Pickup)</h4>
+                  <div className="space-y-1">
+                    <p className="font-black text-gray-900">{selectedDelivery.donorName}</p>
+                    <p className="text-xs text-gray-500 font-medium">{selectedDelivery.pickupLocation}</p>
+                    <div className="flex items-center gap-2 mt-2 text-emerald-600">
+                      <i className="fa-solid fa-phone text-[10px]"></i>
+                      <span className="text-xs font-bold">{selectedDelivery.donorPhone || 'No contact provided'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Recipient (Drop-off)</h4>
+                  <div className="space-y-1">
+                    <p className="font-black text-gray-900">{selectedDelivery.recipientName}</p>
+                    <p className="text-xs text-gray-500 font-medium">{selectedDelivery.dropoffLocation}</p>
+                    <div className="flex items-center gap-2 mt-2 text-blue-600">
+                      <i className="fa-solid fa-phone text-[10px]"></i>
+                      <span className="text-xs font-bold">{selectedDelivery.recipientPhone || 'No contact provided'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-gray-50 flex gap-4">
+                <button 
+                  onClick={() => window.open(`tel:${selectedDelivery.donorPhone}`, '_self')}
+                  className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-gray-100"
+                >
+                  Call Donor
+                </button>
+                <button 
+                  onClick={() => window.open(`tel:${selectedDelivery.recipientPhone}`, '_self')}
+                  className="flex-1 py-4 bg-white border-2 border-gray-100 text-gray-700 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all"
+                >
+                  Call Recipient
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

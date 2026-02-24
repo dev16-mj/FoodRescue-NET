@@ -90,6 +90,7 @@ const App: React.FC = () => {
   };
 
   const handleAddDonation = async (item: FoodItem) => {
+    if (!currentUser) return;
     await db.saveFoodItem(item);
     setFoodItems(prev => [item, ...prev]);
     
@@ -98,6 +99,7 @@ const App: React.FC = () => {
       foodId: item.id,
       foodTitle: item.title,
       donorName: item.donorName,
+      donorPhone: currentUser.phone || '+91 98765 43210', // Fallback for demo
       recipientName: 'Pending NGO',
       pickupLocation: item.location,
       dropoffLocation: 'Regional Distribution Hub',
@@ -111,7 +113,7 @@ const App: React.FC = () => {
     setActiveTab('browse');
   };
 
-  const handleRequestFood = async (foodId: string) => {
+  const handleRequestFood = async (foodId: string, deliveryAddress: string) => {
     if (!currentUser) return;
     const food = foodItems.find(f => f.id === foodId);
     if (!food) return;
@@ -123,7 +125,8 @@ const App: React.FC = () => {
         requesterId: currentUser.id,
         requesterName: currentUser.name,
         status: 'Pending',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        deliveryAddress: deliveryAddress
     };
     await db.saveRequest(newRequest);
     setRequests(prev => [newRequest, ...prev]);
@@ -131,6 +134,20 @@ const App: React.FC = () => {
     const updatedFood = { ...food, status: 'Requested' as const };
     await db.updateFoodItem(updatedFood);
     setFoodItems(prev => prev.map(f => f.id === foodId ? updatedFood : f));
+    
+    // Update delivery record if it exists
+    const delivery = deliveries.find(d => d.foodId === foodId);
+    if (delivery) {
+      const updatedDelivery = { 
+        ...delivery, 
+        recipientName: currentUser.name, 
+        recipientPhone: currentUser.phone || '+91 88888 77777', // Fallback for demo
+        dropoffLocation: deliveryAddress 
+      };
+      await db.updateDelivery(updatedDelivery);
+      setDeliveries(prev => prev.map(d => d.id === delivery.id ? updatedDelivery : d));
+    }
+
     setActiveTab('requests');
   };
 
